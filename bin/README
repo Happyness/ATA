@@ -1,0 +1,9 @@
+Här lägger man alla binära filer
+
+Windows - För plattformen Windows
+	32 - 32 bitars binära filer
+	64 - 64 bitars binära filer
+	
+Unix - För plattformen Unix (Även Linux)
+	32 - 32 bitars binära filer
+	64 - 64 bitars binära filer

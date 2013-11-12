@@ -1,0 +1,23 @@
+all: calc controller network server client
+
+libraries: calc controller network
+
+test_stuff: server client
+
+network: ..\src\includes\network\udp_protocol.c
+	gcc -O0 -ggdb -c -o libudp_protocol.o ..\src\includes\network\udp_protocol.c
+	gcc -O0 -ggdb -shared -o libudp_protocol.dll libudp_protocol.o -lws2_32
+
+controller: ..\src\includes\player\controller.c
+	gcc -O0 -ggdb -c -o libcontroller.o ..\src\includes\player\controller.c
+	gcc -O0 -ggdb -shared -L. -llibcalc -o libcontroller.dll libcontroller.o
+
+calc: ..\src\includes\libcalc.c
+	gcc -O0 -ggdb -c -o libcalc.o  ..\src\includes\libcalc.c
+	gcc -O0 -ggdb -shared -o libcalc.dll libcalc.o
+
+client: ..\src\client.c
+	gcc -O0 -ggdb -o client ..\src\client.c -lws2_32 -L . -ludp_protocol
+
+server: ..\src\server.c
+	gcc -O0 -ggdb -o server ..\src\server.c -lmingw32 -L . -ludp_protocol -lcontroller -lcalc -IC:\SDL\SDL-1.2.13\include\SDL -LC:\SDL\SDL-1.2.13\lib -lSDLmain -lSDL -lws2_32

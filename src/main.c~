@@ -1,0 +1,182 @@
+/**
+ * Runs the server with SDL threads for each client connection
+ *
+ * @author Joel Denke		mail@happyness.se
+ * @author Marcus Isaksson	marcus.is@telia.com
+ * @date   12 april 2012
+ */
+
+// System headers
+#include <stdlib.h>	
+
+#include <stdio.h>
+#include <unistd.h>
+#include <SDL_thread.h>
+#include <SDL.h>
+
+// User headers
+#include "world/world.h"
+
+int runPlayer(void* parameters);
+
+int noClients = 0;
+SDL_Thread * threads[NO_PLAYERS];
+struct world gameWorld;
+
+int testCollision()
+{
+	struct box a, b;
+	
+	a.x = 0;
+	a.y = 0;
+	a.width = 10;
+	a.height = 10;
+	
+	b.x = -10;
+	b.y = 10;
+	b.width = 10;
+	b.height = 10;
+	
+	if (isCollision(a, b)) {
+		printf("Collision detected!\n");
+		return 1;
+	} else {
+		printf("No collision!");
+		return 2;
+	}
+}
+
+void sendToClient(int id)
+{
+	
+}
+
+int clientConnect(int id)
+{
+	return 1;
+}
+
+int clientDisconnect(int id)
+{
+	return 1;
+}
+
+int isConnected(int id)
+{
+	return 1;
+}
+
+int hasInput()
+{
+	return 1;
+}
+
+/**
+ * Initiates a player on a thread
+ *
+ * @author Joel Denke	mail@happyness.se
+ * @param  id		Client identification number
+ * @return 		Returns 0:1 depending if thread creation is succeeded or not.
+ */
+int initPlayer(int id)
+{
+	int rValue;
+	struct player player;
+	
+	gameWorld.players[id]            = player;
+	gameWorld.players[id].id         = id;
+	gameWorld.players[id].box.x      = 0;
+	gameWorld.players[id].box.y      = 0;
+	gameWorld.players[id].box.width  = 10;
+	gameWorld.players[id].box.height = 10;
+	gameWorld.players[id].team       = 1;
+
+	sendToClient(id);
+
+	threads[id] = SDL_CreateThread(runPlayer, &gameWorld.players[id]);
+
+	if (threads[id] == NULL) {
+		printf("\nSDL_CreateThread failed: %s\n", SDL_GetError());
+		return 0;
+	} else {
+		printf("Player %d is connected\n", id + 1);
+	}
+	
+	return 1;
+}
+
+/**
+ * Inititate and run clients on the server
+ *
+ *
+ */
+int main()
+{
+	// Create server socket to network
+	int i, rValue;
+	/*
+	for (i = 0; i < NO_PLAYERS; i++) {
+		gameWorld.players[i] = NULL;
+	}
+	
+	// parse level list file into array
+	// take random level reference id from array.
+	// Then load level text file data, take each row and parse into object struct
+	// wait until graphic part decide how to do this?
+	
+	// Parse the level json (or whatever format we will use) data into object structs.
+	// Do not forget to parse the monsters (Panrike, Torgny, Anders m.fl.)
+	for (i = 0; i < NO_OBJECTS; i++) {
+		gameWorld.objects[i] = NULL;
+	}
+	*/
+	
+	while (1) {
+		if (noClients < NO_PLAYERS) {
+			for (i = 0; i < NO_PLAYERS; i++) {
+				if (clientConnect(i)) {
+					if (initPlayer(i)) {
+						noClients++;
+					}
+				}
+				
+				if (clientDisconnect(i) == 0) {
+					printf("Player %d disconnected\n", i + 1);
+					SDL_WaitThread(threads[i], &rValue);
+					noClients--;
+					// sendMessageToClients();
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Runs the client thread (Listen for user input, moveplayer and synchronize client to server)
+ *
+ * @author	Joel Denke	mail@happyness.se
+ * @param	parameters	void-pointer to player
+ * @return			Always return 0 when thread end
+ */
+int runPlayer(void* parameters)
+{
+	struct player * p = (struct player*) parameters;
+	enum   movement direction = right;
+	int rValue;
+	
+	while (isConnected(p->id)) {
+		if (noClients > MIN_PLAYERS) {
+			printf("Player %d is playing\n", p->id + 1);
+			sleep(1);
+		
+			if (hasInput()) {
+				gravity(p, gameWorld.objects, gameWorld.noOfObjects);
+				//movePlayer(p, gameWorld.objects, gameWorld.noOfObjects, direction);
+			
+				sendToClient(p->id); // Send gameWorld
+			}
+		}
+	}
+	
+	return 0;
+}

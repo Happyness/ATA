@@ -1,0 +1,5 @@
+project(player)
+find_library(libcalc REQUIRED)
+include_directories(${CMAKE_BINARY_DIR}/clientserver/src/includes)
+add_library(controller SHARED controller.c)
+

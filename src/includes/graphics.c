@@ -1,0 +1,474 @@
+/* Author
+ * Name: Robin Jakobsson / Sarah Larsson
+ * Email:    Rjak@kth.se /
+ * id:       910724-2696 /
+ * Grupp:
+ */
+
+#include <SDL/SDL.h>
+#include <SDL/SDL_opengl.h>
+#include <stdio.h>
+
+#if defined(__WIN32__) || defined(WIN32)
+#include <conio.h>
+#endif
+
+#include "graphics/timer.h"
+#include "graphics/world.h"
+#include "graphics/menu.h"
+#include "graphics/load_image.h"
+//#include "graphics/load_font.h"
+#include "graphics/editor.h"
+#include "graphics.h"
+
+SDL_Event event;
+
+players gplayers;
+editor objects[MAX_OBJECTS];
+levels level;
+
+/*
+ * Author: Robin
+ * Description: initializing opengl and set the screen view to pixels used so
+ *              its much easyer to program. Also Enable Alpha blending so we
+ *              are able to use transparenty on textures.
+ *
+ */
+int init_GL()
+{
+    //Enable Alpha blending
+    glDisable(GL_DEPTH_TEST);
+    glDepthFunc(GL_NEVER);
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.1f);
+
+    //Set clear color
+    glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+    //set viewport
+    glViewport( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT );
+    //Set projection
+    glMatrixMode( GL_PROJECTION );
+    glLoadIdentity();
+    glOrtho( 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, -1, 1 );
+    //Initialize modelview matrix
+    glMatrixMode( GL_MODELVIEW );
+    glLoadIdentity();
+    //If there was any errors
+    if( glGetError() != GL_NO_ERROR )
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
+/*
+ * Author: Robin
+ * Description: initializing SDL and some textures, also set the program icon and caption
+ *
+ */
+int init()
+{
+    //init SDL
+    if( SDL_Init( SDL_INIT_EVERYTHING ) < 0 )
+    {
+        return 0;
+    }
+
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+
+    //set icon
+    Uint32          colorkey;
+    SDL_Surface     *icon;
+    
+    //icon = SDL_LoadBMP("icon.bmp");
+    //printf("After load icon\n");
+    
+    //colorkey = SDL_MapRGB(icon->format, 255, 255, 255);
+    //SDL_SetColorKey(icon, SDL_SRCCOLORKEY, colorkey);
+    //SDL_WM_SetIcon(icon,NULL);
+
+    //Set video mode
+    if( SDL_SetVideoMode( SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP, SDL_OPENGL ) == NULL )
+    {
+        return 0;
+    }
+
+    printf("before init open gl\n");
+    //init GL
+    if( init_GL() == 0 )
+    {
+        return 0;
+    }
+
+    //if(TTF_Init() ==-1)
+    //{
+     //   return 0;
+    //}
+    //set window massage
+    SDL_WM_SetCaption( "Amazing Tiny Adventures", NULL );
+
+    //init_editor();
+
+    return 1;
+}
+/*
+ * Author: Robin
+ * Description: Clean up every texture by sending the adress to each function
+ *              and from there we use gldeletetexture
+ */
+void clean_up()
+{
+    glFinish();
+    clean_up_menu(&meny);
+    clean_up_world(&level,&gplayers);
+    clean_up_editor(&texture);
+    //TTF_Quit();
+    SDL_Quit();
+    printf("The program exited correctly");
+}
+
+/*
+ * Author: Robin & Sarah
+ * Description: This function is activ while playing, it handles input from user
+ *              it also initializes background texture, player texture, player starting point
+ *              set text color and font. Draw the screen
+ */
+void playing()
+{
+    //integer for exiting the program
+    int quit = 0;
+
+    //temp values for x velocity and y velocity
+    float xVel = 0;
+    float yVel = 0;
+
+    //init level
+    //load_level("level_backgrund.png");
+    
+    printf("After load level\n");
+
+    //init player starting point, speed, color and gravity.. etc..
+    player_set_xy ( (SCREEN_WIDTH-PLAYER_WIDTH)/2, SCREEN_HEIGHT-PLAYER_HEIGHT );
+    player_set_velocity ( 0, 0 );
+    player_init("torgny.png");
+    //init_font( /*"font/comicbd.ttf"*/ );
+    //set_text_color( 255, 255, 255 );
+
+    //The frame rate regulator
+    struct timer_t2 fps;
+
+    //Wait for user exit
+    while( quit == 0 )
+    {
+        //Start the frame timer
+        timer_start(&fps);
+
+        //While there are events to handle
+        while( SDL_PollEvent( &event ) )
+        {
+            //Handle events:
+            if(event.type == SDL_KEYDOWN)
+            {
+                switch(event.key.keysym.sym)
+                {
+                    case SDLK_LEFT: // Change velocity of the player to the left
+                        xVel -= PLAYER_WIDTH / 4; break;
+                    case SDLK_RIGHT: // Change velocity of the player to the right
+                        xVel += PLAYER_WIDTH / 4; break;
+                    case SDLK_SPACE: // set jump to 1
+                        player_set_jump ( 1 ); break;
+                }
+                break;
+            }
+
+            else if( event.type == SDL_KEYUP)
+            {
+
+                switch(event.key.keysym.sym)
+                {
+                    case SDLK_LEFT: // Change velocity of the player
+                        xVel += PLAYER_WIDTH / 4; break;
+                    case SDLK_RIGHT: // Change velocity of the player
+                        xVel -= PLAYER_WIDTH / 4; break;
+                    case SDLK_ESCAPE:
+                        quit=1;
+                }
+                break;
+            }
+            //if x the window. quit the program
+            if( event.type == SDL_QUIT )
+            {
+                clean_up();
+                exit(0);
+            }
+
+        }
+
+        //jump the player
+        player_jump(SCREEN_HEIGHT);
+
+        //Send velocity
+        player_set_velocity (xVel, yVel);
+
+        //Move the player
+        player_move(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        //pans the camera
+        camera_move(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        //Show the player and level
+        //world_show(SCREEN_WIDTH,SCREEN_HEIGHT);
+
+        glFlush();
+
+        //Update screen
+        SDL_GL_SwapBuffers();
+
+        //Clear the screen
+        glClear( GL_COLOR_BUFFER_BIT );
+
+
+        //Capture the frame rate
+        if( timer_get_ticks(&fps) < 1000 / FRAMES_PER_SECOND )
+        {
+            //delay the as much time as we need to get desired frames per second
+            SDL_Delay( ( 1000 / FRAMES_PER_SECOND ) - timer_get_ticks(&fps) );
+        }
+
+    }
+}
+/*
+ * Author: Robin & Sarah
+ * Description: handles input to create and edit objects, draw the map.
+ *              Save the map using a binary text file
+ */
+void in_editor()
+{
+    int quit = 0;
+    int pre_property = 0;
+    int object_data;
+    int left_ctrl=0;
+    int moving = 0;
+    int old_mouse_x;
+    int old_mouse_y;
+    //fps
+    struct timer_t2 fps;
+
+    FILE *save_map;
+
+    //wait for user to continue or exit
+    while( quit != 1 )
+    {
+        //Start the frame timer
+        timer_start(&fps);
+        //While there are events to handle
+        while( SDL_PollEvent( &event ) )
+        {
+
+            if( event.type == SDL_QUIT )
+            {
+                save_map = fopen("map.dat","wb");
+                fwrite(&objects,sizeof(editor),MAX_OBJECTS,save_map);
+                fclose(save_map);
+                //exit
+                clean_up();
+                exit(0);
+            }
+
+            if(event.type == SDL_KEYDOWN)
+            {
+                switch(event.key.keysym.sym)
+                {
+                    case SDLK_LCTRL://is left ctrl being pressed?
+                        left_ctrl = 1; break;
+                    default:
+                        break;
+                }
+            }
+            //set property, handle keyevents
+            if(event.type == SDL_KEYUP)
+            {
+                switch(event.key.keysym.sym)
+                {
+                    case SDLK_1:
+                        pre_property = 1; break;
+
+                    case SDLK_2:
+                        pre_property = 2; break;
+
+                    case SDLK_3:
+                        pre_property = 3; break;
+
+                    case SDLK_4:
+                        pre_property = 4; break;
+
+                    case SDLK_5:
+                        pre_property = 5; break;
+
+                    case SDLK_6:
+                        pre_property = 6; break;
+
+                    case SDLK_7:
+                        pre_property = 7; break;
+
+                    case SDLK_8:
+                        pre_property = 8; break;
+
+                    case SDLK_LCTRL:
+                        left_ctrl = 0; break;
+                    case SDLK_z:
+                        if(left_ctrl == 1)
+                        {
+                            if(object_data>=0)
+                            {
+                                editor_undo(object_data);
+                                object_data--;
+                            }
+                            break;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    //save the map before quiting
+                    case SDLK_ESCAPE:
+                        save_map = fopen("map.dat","wb");
+                        printf("saving objects\n");
+                        fwrite(&objects,sizeof(editor),MAX_OBJECTS,save_map);
+                        fclose(save_map);
+                        quit = 1; break;
+                    default:
+                        break;
+                }
+                break;
+            }
+            if(moving == 1)
+            {
+                editor_update_move_object(event.button.x, event.button.y, &old_mouse_x, &old_mouse_y);
+            }
+            if( event.type == SDL_MOUSEBUTTONDOWN)
+            {
+                switch(event.button.button)
+                {
+                    case SDL_BUTTON_RIGHT:
+                        moving = 1;
+                        editor_start_move_object(event.button.x, event.button.y, &old_mouse_x, &old_mouse_y);
+                        break;
+                }
+            }
+            if( event.type == SDL_MOUSEBUTTONUP)
+            {
+                switch(event.button.button)
+                {
+                    case SDL_BUTTON_LEFT:
+                        editor_create_object(event.button.x, event.button.y, pre_property, &object_data);
+                        break;
+                    case SDL_BUTTON_RIGHT:
+                        moving = 0;
+                        break;
+                }
+            }
+        }
+        //draw menu
+        editor_show(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        glFlush();
+        //Update screen
+        SDL_GL_SwapBuffers();
+        //Clear the screen
+        glClear( GL_COLOR_BUFFER_BIT );
+
+        if( timer_get_ticks(&fps) < 1000 / FRAMES_PER_SECOND )
+        {
+            //delay the as much time as we need to get desired frames per second
+            SDL_Delay( ( 1000 / FRAMES_PER_SECOND ) - timer_get_ticks(&fps) );
+        }
+    }
+}
+/*
+ * Author: Robin & Sarah
+ * Description: initializing textures button positions etc..
+ *              handle mouse events so we are able to use our menu
+ */
+void in_menu()
+{
+    int mouse_pressed = 0;
+    //fps
+    struct timer_t2 fps;
+
+    printf("Before trying to load the menu in load manu\n");
+    
+    //load menu
+    load_menu("main_menu_background.png",
+	      "play_inactiv.png",
+              "options_inactiv.png",
+              "editor_inactiv.png",
+              "exit_inactiv.png",
+              SCREEN_WIDTH,
+              SCREEN_HEIGHT);
+    
+    printf("After load menu\n");
+
+    //wait for user to continue or exit
+    while( 1 )
+    {
+	    printf("Wait for user input\n"); 
+        //Start the frame timer
+        timer_start(&fps);
+        //While there are events to handle
+        while( SDL_PollEvent( &event ) )
+        {
+
+            if( event.type == SDL_QUIT )
+            {
+                //exit
+                clean_up();
+                exit(0);
+            }
+
+            if (mouse_pressed != 1)
+            {
+                mouse_over_menu(event.button.x, event.button.y);
+            }
+
+            if( event.type == SDL_MOUSEBUTTONDOWN)
+            {
+                switch(event.button.button)
+                {
+                    case SDL_BUTTON_LEFT:
+                        mouse_pressed = mouse_down_menu(event.button.x, event.button.y);
+                        break;
+                }
+            }
+
+            //is mousebuttom being pressed
+            if( event.type == SDL_MOUSEBUTTONUP)
+            {
+                switch(event.button.button)
+                {
+                    case SDL_BUTTON_LEFT:
+                        mouse_pressed = press_menu(event.button.x, event.button.y);
+                        break;
+                }
+            }
+        }
+
+        //draw menu
+        show_menu(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        glFlush();
+
+        //Update screen
+        SDL_GL_SwapBuffers();
+        //Clear the screen
+        glClear( GL_COLOR_BUFFER_BIT );
+
+        if( timer_get_ticks(&fps) < 1000 / FRAMES_PER_SECOND )
+        {
+            //delay the as much time as we need to get desired frames per second
+            SDL_Delay( ( 1000 / FRAMES_PER_SECOND ) - timer_get_ticks(&fps) );
+        }
+    }
+}

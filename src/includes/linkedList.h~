@@ -1,0 +1,65 @@
+/*
+ Author: 	Joel Denke
+ Description: 	Implementation of circular doubly linked list (For traversing/iterating through our event que)
+ Created:	25 april 2012
+ */
+
+#ifndef _LINKEDLIST_H
+#define _LINKEDLIST_H
+
+typedef struct node linkNode;
+
+struct node {
+	linkNode *next, *prev;
+	void * data;
+};
+
+typedef struct {
+	linkNode *current, *end;
+} nodeList;
+
+/**
+ Author: 	Joel Denke
+ Description: 	Create a new node compatible with linked list
+ Params:	void *, Data to store in node
+ Return value: The new node cotanaining assigned data
+ */
+linkNode * createNode(void *);
+
+/**
+ Author: 	Joel Denke
+ Description: 	Go to node number "i" in the linked list
+ Params:	nodeList*, Contains info about the linked list
+		int, The element number
+		Return value: Nothing
+ */
+void gotoNode(nodeList *, int);
+
+/**
+ Author: 	Joel Denke
+ Description: 	Insert a node efter another one
+ Params:	linkNode*, The before node element
+		linkNode*, The after node element
+ Return value: Nothing
+ */
+void insertAfter(linkNode *, linkNode *);
+
+/**
+ Author: 	Joel Denke
+ Description: 	Insert a node at the end
+ Params:	nodeList*, Contains info about the linked list
+		linkNode*, The node element
+ Return value: Nothing
+ */
+void insertEnd(nodeList *, linkNode *);
+
+/**
+ Author: 	Joel Denke
+ Description: 	Remove a node from the linked list
+ Params:	nodeList*, Contains info about the linked list
+ linkNode*, The node element
+ Return value: Nothing
+ */
+void removeNode(nodeList *, linkNode *);
+
+#endif

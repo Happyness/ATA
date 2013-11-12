@@ -1,0 +1,25 @@
+all: calc controller network server client 
+
+libraries: calc controller network
+
+test_stuff: server client
+
+network: includes/network/udp_protocol.c
+	gcc -O0 -ggdb -c -fPIC -o libudp_protocol.o ./includes/network/udp_protocol.c
+	gcc -O0 -ggdb -fPIC -shared -o libudp_protocol.so libudp_protocol.o 
+
+controller: includes/player/controller.c
+	gcc -O0 -ggdb -c -fPIC -o libcontroller.o ./includes/player/controller.c
+	gcc -O0 -ggdb -fPIC -shared -o libcontroller.so libcontroller.o
+
+calc: includes/libcalc.c
+	gcc -O0 -ggdb -c -fPIC -o libcalc.o  ./includes/libcalc.c
+	gcc -O0 -ggdb -fPIC -shared -o libcalc.so libcalc.o
+
+client: client.c
+	gcc -O0 -ggdb -o client client.c -L . -ludp_protocol  -lSDL
+	paxctl -m client
+
+server: server.c
+	gcc -O0 -ggdb -o server server.c -L . -ludp_protocol -lcontroller -lcalc -lSDL
+	paxctl -m server

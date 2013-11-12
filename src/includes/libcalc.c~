@@ -1,7 +1,4 @@
- #include <stdlib.h>
- #include <stdio.h>
- #include <unistd.h>
- #include "world/structure.h"
+ #include <libcalc.h>
  
  int isCollision(box a, box b)
  {
@@ -13,18 +10,16 @@
 	 return (x1_2 >= x2_1 && x2_2 >= x1_1) && (y1_2 >= y2_1 && y2_2 >= y1_1);
  }
  
- int calculateLengthToMove(player * player, movement direction)
- {
+int calculateLengthToMove(box tile, movement direction)
+{
 	 switch (direction) {
 		 case left  :
 		 case right :
-			 return player->dx;
+			 return tile.dx;
 			 break;
 		 case up :
-			 return player->dy - player->dy*GRAVITY;
-			 break;
-		 case down :
-			 return player->dy + player->dy*GRAVITY;
+		 case down:
+			 return tile.dy;
 			 break;
 	 }
  }

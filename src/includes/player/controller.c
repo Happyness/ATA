@@ -1,73 +1,147 @@
-// Inkludera bibliotek för grafik här
-#include <stdio.h>
-#include "../graphics/structure.h"
 #include "controller.h"
-#include "../libcalc.h"
-#include "playerInput.c"
- 
-void movePlayer(player* testPlayer, object * objects, int noOfObjects, movement direction)
+
+int movePlayer(player* p, world * gWorld, int no_players, movement direction)
 {
-	 int i, collision = 0, objectCollided = -1;
-	 box tmpbox = testPlayer->box;
-	 
-	 printf("player %d was on coordinate [%d, %d]\n", testPlayer->no, tmpbox.x, tmpbox.y);
-	 printf("Check enum value %d on move\n", direction);
-	 
+	 int i, x = 0, y = 0, move;
+	 box tmpbox = p->box;
+	 int length = calculateLengthToMove(tmpbox, direction);
+
+	 //printf("player %d was on coordinate [%d, %d]\n", p->id, tmpbox.x, tmpbox.y);
+
 	 switch (direction) {
 		 case left :
-			 printf("Move player left %d steps \n", calculateLengthToMove(testPlayer, direction));
-			 tmpbox.x -= calculateLengthToMove(testPlayer, direction);
+			 x -= length;
+			 tmpbox.x += x;
 			 break;
 		 case right :
-			 printf("Move player right %d steps \n", calculateLengthToMove(testPlayer, direction));
-			 tmpbox.x += calculateLengthToMove(testPlayer, direction);
+			 x += length;
+			 tmpbox.x += x;
 			 break;
 		 case up :
-			 tmpbox.y -= calculateLengthToMove(testPlayer, direction);
-			 break;
-		 default :
+			y -= length*20;
+			tmpbox.y += y;
 			 break;
 	 }
 	 
-	 for (i = 0; i < noOfObjects; i++) {
-		 printf("testCollision\n");
-		 
-		 if (isCollision(tmpbox, objects[i].box)) {
-			 collision = 1;
-			 objectCollided = i;
-			 break;
-		 }
-	 }
-	 
-	 if (!collision) {
-		 testPlayer->box = tmpbox;
-		 printf("player %d is now on coordinate [%d, %d]\n", testPlayer->no, tmpbox.x, tmpbox.y);
-	 } else {
-		printf("Player collidated with object %d on coordinate [%d, %d]\n", objects[objectCollided].id, objects[objectCollided].box.x, objects[objectCollided].box.y);
-		 
-		if (objects[objectCollided].movable) {
-			objects[objectCollided].box.x += testPlayer->dx;
-			objects[objectCollided].box.y += testPlayer->dy;
+	 //printf("Try to move player %d [%d, %d]\n", p->id, x, y);
+
+	 move = moveObjects(gWorld, tmpbox, no_players, p->id, -1, x, y);
+
+	 if (move == -1) {
+		 if (tmpbox.y > 600 || tmpbox.y < 0) {
+			 printf("You tried walk outside screen\n");
+			 p->velocity = 0;
+			 p->blockup = 1;
+		 } else if (tmpbox.x < 800 && tmpbox.x > 0) {
+			 p->box = tmpbox;
 		}
+		 //printf("player %d is now on coordinate [%d, %d]\n", p->id, tmpbox.x, tmpbox.y);
+		 return 1;
+	 } else {
+		 return 0;
 	 }
 }
- 
-void gravity(player* testPlayer, object * objects, int noOfObjects)
+
+int checkPlayerCollision(world * gWorld, int no_players, int pId, box tile)
 {
-	 int i, collision        = 0;
-	 box tmpbox       = testPlayer->box;
+	int i;
+	
+	for (i = 0; i < no_players; i++) {
+		if (gWorld->players[i].id != pId && isCollision(gWorld->players[i].box, tile)) {
+			return 0;
+		}
+	}
+	
+	return 1;
+}
+
+int moveObjects(world * gWorld, box tmpbox, int no_players, int pId, int id, int x, int y)
+{
+	int i;
+
+	for (i = 0; i < NO_OBJECTS; i++)
+	{
+		if (i != id && i != 0 && i!= 1) {
+			if (isCollision(tmpbox, gWorld->objects[i].box)) {
+				if (gWorld->objects[i].movable)
+				{
+					box tmpbox2 = gWorld->objects[i].box;
+					
+					tmpbox2.x += x;
+					tmpbox2.y += y;
+					
+					if (checkPlayerCollision(gWorld, no_players, pId, tmpbox2)) {
+						if (moveObjects(gWorld, tmpbox2, no_players, pId, i, x, y) == -1)
+						{
+							gWorld->objects[i].box = tmpbox2;
+							return -1;
+						} else {
+							return -2;
+						}
+					} else {
+						return -2;
+					}
+				}
+
+				return -2;
+			}
+		}
+	}
+
+	if (id != -1) {
+		gWorld->objects[id].box.x += x;
+		gWorld->objects[id].box.y += y;
+		
+		if (checkPlayerCollision(gWorld, no_players, pId, gWorld->objects[id].box)) {
+			return -1;
+		} else {
+			return -2;
+		}
+	}
+
+	return -1;
+}
+
+void fallObjects(world * gWorld, int no_players)
+{
+	int i, move, y, x=0;
+	box tmpbox;
+	movement direction = down;
+
+	for (i = 0; i < NO_OBJECTS; i++) {
+		if (gWorld->objects[i].movable) {
+			tmpbox    = gWorld->objects[i].box;
+			y         = calculateLengthToMove(tmpbox, direction);
+
+			tmpbox.y += y;
+
+			move = moveObjects(gWorld, tmpbox, no_players, -1, -1, x, y);
+
+			if (move == -1) {
+				gWorld->objects[i].box = tmpbox;
+				//printf("Object %d is now on coordinate [%d, %d]\n", gWorld->objects[i].id, tmpbox.x, tmpbox.y);
+			}
+		}
+	}
+}
+
+void gravity(player* p, world * gWorld, int no_players)
+{
+	 int i, move, y = 0;
+	 box tmpbox         = p->box;
 	 movement direction = down;
-	 
-	 tmpbox.y += calculateLengthToMove(testPlayer, direction);
-	 
-	 for (i = 0; i < noOfObjects; i++) {
-		 if (isCollision(tmpbox, objects[i].box)) {
-			 collision = 1;
-			 break;
-		 }
-	 }
-	 
-	 if (!collision) {
-		 testPlayer->box = tmpbox;
+
+	 y = calculateLengthToMove(p->box, direction);
+	 tmpbox.y += y + p->velocity;
+
+	 move = moveObjects(gWorld, tmpbox, no_players, -1, -1, 0, y);
+
+	 if (move == -1) {
+		 p->box = tmpbox;
+		 //printf("player %d is now on coordinate [%d, %d]\n", testPlayer->id, tmpbox.x, tmpbox.y);
+	 } else {
+		p->jump = 0;
+		p->blockup = 0;
+		p->velocity = 5;
 	 }
 }

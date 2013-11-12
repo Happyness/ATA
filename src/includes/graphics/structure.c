@@ -1,53 +1,51 @@
-/**
-* Contains structs and functions for modifying the game world.
-*
-* @author Joel Denke      	mail@happyness.se
-* @author Marcus Isaksson 	marcus.is@telia.com
-* @date   12 april 2012
-*/
-
-#include <stdio.h>
 #include "structure.h"
 
 #ifndef _C_STRUCTURE
-#define _C_STRUCTURE 
+#define _C_STRUCTURE
 
-sType getType(char * data)
+char * getMapFile(int i)
 {
+	printf("Try to get map number %d\n", i);
 	
+	if (i > 0 && i <= 3) {
+		char * filename = malloc(sizeof(char) * 30);
+		sprintf(filename, "levels/map%d.dat", i);
+	
+		return filename;
+	} else {
+		perror("Invalid map number\n");
+		exit(1);
+	}
 }
 
-void * strToStruct(char * data)
+void mapSave(world * gameWorld, int no)
 {
-	sType type = getType(data);
-	
-	switch (type) {
-		case sPlayer:
-		case sObject:
-		case sCoordinate:
-		case sAction:
-		case sMessage:
-			
-			break;
-			
-	}
-	
-	return NULL;
+	FILE *save_map;
+
+	printf("saving map\n");
+
+	save_map = fopen(getMapFile(no), "wb");
+	fwrite(&gameWorld->objects, sizeof(object), NO_OBJECTS, save_map);
+	fclose(save_map);
 }
 
-char * structToStr(void * data, sType type)
-{	
-	switch (type) {
-		case sPlayer:
-		case sObject:
-		case sCoordinate:
-		case sAction:
-		case sMessage:
-			break;
-			
-	}
-	
-	return NULL;
-}
+int mapLoad(world * gameWorld, int no)
+{
+	FILE *load_map;
 
+	printf("Loading map\n");
+
+	load_map = fopen(getMapFile(no), "rb");
+	fread(gameWorld->objects, sizeof(object), NO_OBJECTS, load_map);
+	fclose(load_map);
+
+	int i;
+	for(i = 0; i < NO_OBJECTS; i++)
+	{
+		if (gameWorld->objects[i].property == 0)
+		{
+			return i - 1;
+		}
+	}
+}
 #endif

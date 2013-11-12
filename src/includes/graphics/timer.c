@@ -1,16 +1,15 @@
+/**
+ * Author
+ * Name: Robin Jakobsson / Sarah Larsson
+ * Email:    Rjak@kth.se / Saralar@kth.se
+ * id:       910724-2696 / 910222-4848
+ * Grupp: 2
+ */
+
 #ifndef _C_TIMER
 #define _C_TIMER
 
-#include <SDL/SDL.h>
-
 #include "timer.h"
-
-/*
- * Author: Robin & Sarah
- * Description: This file is used for calculation Frames per seconds. with diffrent option like using
- *              timer start, stop, pause, unpause, and one very important get_tickets.
- *
- */
 
 void timer_init (struct timer_t2 * timer)
 {

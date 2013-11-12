@@ -1,4 +1,4 @@
-/*
+/**
  Author: 	Joel Denke and Marcus Isaksson
  Description: 	Runs the server with SDL threads for each client connection
  Created:	12 april 2012
@@ -14,64 +14,37 @@
 
 // User headers
 #include "includes/graphics/structure.h"
+#include "includes/graphics/timer.h"
 #include "includes/player/controller.h"
-#include "includes/libcalc.h"
-#include "includes/linkedList.h"
+#include "includes/calc.h"
+#include "includes/cbuffer.h"
 #include "includes/network/udp_protocol.h"
 
-#define LOG "./eventhandling.log"
-#define SIZE 4096
+#define MESSAGE_SIZE 1500
+#define BUFFER_SIZE 10
 #define PORT 1025
 
 int runPlayer(void* parameters);
-void _logit(FILE *, char *);
+void cleanup();
 
-int noClients = 6;
-char** messageBuffer;
-
-SDL_Thread *threads[NO_PLAYERS];
-SDL_Thread *listener;
-SDL_mutex  *lock;
-world gameWorld;
-
+/* client connection information */
 typedef struct {
 	int available, team;
 	connection_data * data;
 } client;
 
-typedef struct {
-	void * function;
-} eCallback;
-
-typedef enum {gPause, gRunning, gEnd} gState;
+connection_data * listenConnection;
+cBuffer * cb[NO_PLAYERS];
+SDL_Thread *threads[NO_PLAYERS];
+SDL_mutex  *p_lock[NO_PLAYERS];
+world gameWorld;
 client clients[NO_PLAYERS];
-int teams[NO_TEAMS];
 gState state;
+int teams[NO_TEAMS], lConnection = 0;
+int no_players = 6;
+int map_no = 1;
 
-void sendToClient(player * player)
-{
-	// string_to_packet();
-}
-
-int clientDisconnect(int i)
-{
-	//int id = clients[i].id;
-	connection_data *connection = clients[i].data;
-
-	return end_session(connection);
-}
-
-int isConnected(int id)
-{
-	return 1;
-}
-
-int hasInput()
-{
-	return 1;
-}
-
-/*
+/**
  Author: 	Joel Denke
  Description: 	Get first available team number.
  Params: 	id		Team number choice of player
@@ -80,7 +53,7 @@ int hasInput()
 int getAvailableTeam(int choice)
 {
 	int i;
-	int players = (NO_PLAYERS / NO_TEAMS);
+	int players = (no_players / NO_TEAMS);
 
 	if (teams[choice] < players) {
 		teams[choice]++;
@@ -99,7 +72,73 @@ int getAvailableTeam(int choice)
 	return -1;
 }
 
-/*
+void rotateMapNo()
+{
+	map_no = (map_no) % 3 + 1;
+}
+
+/**
+ * Author: 	Marcus Isaksson
+ * Description: 	Check if player collided with winning block
+ * Params: 	p	Player to check
+ */
+void checkPlayersWon()
+{
+	int i;
+
+	for (i = 0; i < no_players; i++) {
+		if (clients[i].available == 0 && gameWorld.players[i].won == 0 && isCollision(gameWorld.players[i].box, gameWorld.objects[1].box)) {
+			printf("Player %d has won!\n", gameWorld.players[i].id);
+			gameWorld.players[i].won = 1;
+		}
+	}
+}
+
+/**
+ Author: 	Marcus Isaksson
+ Description: 	Check if any team has one and send message to clients if any
+ Return value:  If one team one return 1, else 0
+ */
+int checkTeamWon()
+{
+	int p, t, w, i, no = 0;
+	char * data = malloc(sizeof(char) * MESSAGE_SIZE);
+
+	checkPlayersWon();
+
+	for (t = 1; t <= NO_TEAMS; t++)
+	{
+		w = 1;
+
+		for (p = 0; p < no_players; p++) {
+			if (gameWorld.players[p].team == t) {
+				if (gameWorld.players[p].won == 0) {
+					w = 0;
+				}
+			}
+		}
+
+		if (w == 1)
+		{
+			for (i = 0; i < no_players; i++) {
+				cleanSlots(cb[i]);
+			}
+			rotateMapNo();
+			state = gStart;
+			
+			printf("Team %d has won!\n", t);
+			sprintf(data, "%d,%d,%s", 3, t, "win");
+			sendToClients(data, 3);
+			SDL_Delay(11000);
+
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
  Author: 	Joel Denke
  Description: 	Initiates a player on a thread.
  Params: 	id	Client identification number
@@ -110,307 +149,464 @@ int initPlayer(int i)
 	int rValue;
 	player player;
 
-	gameWorld.players[i]            = player;
-	gameWorld.players[i].no         = i;
+	printf("Init player with id %d\n", clients[i].data->client_id);
 	gameWorld.players[i].id         = clients[i].data->client_id;
-	gameWorld.players[i].box.x      = 0;
-	gameWorld.players[i].box.y      = 0;
-	gameWorld.players[i].box.width  = 10;
-	gameWorld.players[i].box.height = 10;
-	gameWorld.players[i].team       = clients[i].team;
+	gameWorld.players[i].box.dx     = BOX_DX;
+	gameWorld.players[i].box.dy     = BOX_DY;
+	gameWorld.players[i].box.x      = gameWorld.objects[0].box.x;
+	gameWorld.players[i].box.y      = gameWorld.objects[0].box.y;
+	gameWorld.players[i].box.width  = PLAYER_WIDTH;
+	gameWorld.players[i].box.height = PLAYER_HEIGHT;
 
-	threads[i] = SDL_CreateThread(&runPlayer, &gameWorld.players[i]);
+	gameWorld.players[i].jumpbox = gameWorld.players[i].box;
+	gameWorld.players[i].jumpbox.width *= 2;
+	gameWorld.players[i].jumpbox.height *= 2;
+	gameWorld.players[i].jump = 0;
+	gameWorld.players[i].velocity = 5;
 
-	if (threads[i] == NULL) {
-		printf("\nPlayer SDL_CreateThread failed: %s\n", SDL_GetError());
-		return -1;
+	if (i % 2) {
+		gameWorld.players[i].team = 1;
+	} else {
+		gameWorld.players[i].team = 2;
 	}
+	gameWorld.players[i].won        = 0;
+	gameWorld.players[i].blockup    = 1;
+
+	//threads[i] = SDL_CreateThread(runPlayer, &gameWorld.players[i]);
+
+	//if (threads[i] == NULL) {
+	//	printf("\nPlayer SDL_CreateThread failed: %s\n", SDL_GetError());
+	//	return -1;
+	//}
 
 	return 0;
 }
 
-int assignEvent(int type, char * data, player *p)
-{
-	/*
-	//sleep(5);
-	gravity(p, gameWorld.objects, gameWorld.noOfObjects);
-	sendToClient(p);
-
-	if (hasInput()) {
-		movePlayer(p, gameWorld.objects, gameWorld.noOfObjects, direction);
-		sendToClient(p); // Send gameWorld
-	}*/
-}
-
-int checkConnections()
-{
-	int i;
-
-	while (1) {
-	  for (i = 0; i < NO_PLAYERS; i++) {
-		  printf("Beginning of for-loop.\n");
-		  if ((clients[i].available == 1) && (accept_session(clients[i].data, PORT, i) == 0)) {
-		    printf("Success to establish connection with client %d!\n", i);
-		    clients[i].available = 0;
-		    clients[i].team      = getAvailableTeam(rand() & 1);
-		    printf("Team: %d\n", clients[i].team);
-		  }
-
-			/*
-			* if (clientDisconnect(i) == 0) {
-			*	printf("Player %d disconnected\n", clients[i].id);
-			*	SDL_KillThread(threads[i]);
-			* 	SDL_KillThread(clients[i].connectionThread);
-			*	//SDL_WaitThread(threads[i], &rValue);
-			*	clients[i].available = 1;
-			*	teams[gameWorld.players[i].team]--;
-			*	// sendMessageToClients();
-			}
-		  printf("End of for-loop.\n");
-		  */
-		}
-	}
-}
-
+/**
+ Austhor: 	Joel Denke
+ Description: 	Check if current connected clients are enough players
+ Return value:  1 if enough players and 0 if not
+ */
 int checkPlayers()
 {
-	int i, noPlayers = 0, minTeamPlayers = 0;
+	int i, noPlayers = 0;
 
-	for (i = 0; i < NO_PLAYERS; i++) {
+	for (i = 0; i < no_players; i++) {
 		if (clients[i].available == 0) {
 			noPlayers++;
 		}
 	}
 
-	for (i = 0; i < NO_TEAMS; i++) {
-	  //		printf("%d players on team no %d\n", teams[i], i + 1);
-
-		if (teams[i] > 0) {
-			minTeamPlayers++;
-		}
-	}
-
-	return (noPlayers >= 2 && minTeamPlayers == 2);
+	return (noPlayers >= no_players);
 }
 
+/**
+ Author: 	Joel Denke
+ Description: 	Starts the game
+ */
 void startGame()
 {
 	int i;
 
-	for (i = 0; i < NO_PLAYERS; i++) {
+	for (i = 0; i < no_players; i++) {
 		if (clients[i].available == 0) {
+			printf("Init player %d\n", i);
 			initPlayer(i);
 		}
 	}
 }
 
-int checkGame()
-{
-  //	printf("Check players output: %d\n", checkPlayers());
-
-	if (state == gEnd) {
-		if (checkPlayers()) {
-			state = gRunning;
-			startGame();
-		}
-	} else {
-		if (!checkPlayers()) {
-			state = gEnd;
-		}
-	}
-}
-
-int updatePlayer()
-{
-	return 5011;
-}
-
-void updateObjects()
-{
-	char string[512];
-	int i;
-	
-	for (i = 0; i < 1; i++) {
-		snprintf(string, 512, "2,%d,%d,%d", gameWorld.objects[i].id, gameWorld.objects[i].box.x, gameWorld.objects[i].box.y);
-		send_data(clients[i].data, string);
-	}
-}
-
-int main(int argc, char *argv[])
-{
-	int i;
-	messageBuffer = malloc((sizeof(char*) * NO_PLAYERS));
-	char* buffer = NULL;
-	int id = 1;
-	connection_data * data = malloc(sizeof(connection_data));
-	connection_data * genericData = malloc(sizeof(connection_data));
-
-	for (i = 0; i < NO_PLAYERS; i++)
-	{
-	    messageBuffer[i] = "";
-	}
-	
-	object tmpobject;
-	tmpobject.box.x = 100;
-	tmpobject.box.y = 0;
-	tmpobject.box.width = 10;
-	tmpobject.box.height = 10;
-	tmpobject.id = 0;
-	tmpobject.movable = 0;
-	gameWorld.objects[0] = tmpobject;
-
-	printf("Before accept session\n");
-	
-	for (i = 0; i < 1; i++) {
-		accept_session(data, PORT, i+1);
-		
-		gameWorld.players[i].no         = i;
-		gameWorld.players[i].id         = data->client_id;
-		gameWorld.players[i].dx         = 1;
-		gameWorld.players[i].dy         = 1;
-		gameWorld.players[i].mass       = 50;
-		gameWorld.players[i].box.x      = 0;
-		gameWorld.players[i].box.y      = 0;
-		gameWorld.players[i].box.width  = 10;
-		gameWorld.players[i].box.height = 10;
-		gameWorld.players[i].team       = 0;
-		clients[i].available = 0;
-		clients[i].data = data;
-		clients[i].team = 0;
-		threads[i] = SDL_CreateThread(&runPlayer, &gameWorld.players[i]);
-	}
-	
-	genericData = create_connection_data("0.0.0.0", PORT, 0, data->sock_fd, genericData);
-	updateObjects();
-	
-	while(1) {
-		//for (i = 0; i < 2; i++) {
-			buffer = (char *)recv_data(genericData);
-			
-			if (buffer != (char*) NULL) {
-				id = atoi((char*)strsep(&buffer, ","));
-			
-				if (id <= NO_PLAYERS) {
-					printf("Received buffer data: %s\n", buffer);
-					messageBuffer[id] = strdup(buffer);
-				}
-			}
-		//}
-	}
-
-	return 0;
-}
-
-/*
+/**
  Author: 	Joel Denke
- Description: 	Inititate and run clients on the server
-
-int main2(int argc, char *argv[])
+ Description: 	Check if any client connects
+ */
+void checkConnections()
 {
-	// Create server socket to network
-	int i, j, rValue, full = 0, state = gEnd;
-	nodeList *list = malloc(sizeof(nodeList*));
-	char buff[50];
-	FILE * fp;
+	int i, j, result;
+	char * data = malloc(sizeof(char) * 32);
+	
+	for (i = 0; i < no_players; i++) {
+		printf("Check if client %d is available\n", i);
 
-	fp = fopen(LOG, "w");
-	_logit(fp, "Start eventhandling");
+		if (clients[i].available == 1) {
+			result = accept_session(clients[i].data, PORT, i+1);
 
-	insertEnd(list, createNode("test"));
-	linkNode * event = list->end;
-	lock = SDL_CreateMutex();
+			if (result == 0) {
+				printf("Success to establish connection with client %d!\n", clients[i].data->client_id);
+				
+				sprintf(data, "%d,%d,noplayers", 3, no_players);
+				
+				for (j = 0; j < 5; j++) {
+					send_data(clients[i].data, data);
+				}
 
-	for (i = 0; i < NO_TEAMS; i++) {
-		teams[i] = 0;
+				clients[i].available = 0;
+			} else if (result == 1) {
+				printf("A Client disconnected while listening for connections\n");
+			}
+		}
 	}
+}
 
-	for (i = 0; i < NO_PLAYERS; i++) {
-		clients[i].available = 1;
-		clients[i].data      = malloc(sizeof(connection_data));
-	}
-
-	listener = SDL_CreateThread(checkConnections, 0);
-
-	if (listener == NULL) {
-		printf("\nListener SDL_CreateThread failed: %s\n", SDL_GetError());
-		return 0;
-	}
-
-	/*
-	// parse level list file into array
-	// take random level reference id from array.
-	// Then load level text file data, take each row and parse into object struct
-	// wait until graphic part decide h
-
-	// Parse the level json (or whatever format we will use) data into object structs.
-	// Do not forget to parse the monsters (Panrike, Torgny, Anders m.fl.)
-	for (i = 0; i < NO_OBJECTS; i++) {
-		gameWorld.objects[i] = NULL;
-	}
-
-
-	event = event->next;
-	eCallback * eventCb;
+/**
+ Author: 	Joel Denke
+ Description: 	Listen for data sent by clients and insert into buffer
+ */
+int listenData(void * data)
+{
+	int id;
+	char * tmp = malloc(sizeof(char) * MESSAGE_SIZE);
 
 	while (1) {
-		checkGame();
-
-		if (state == gEnd) {
-			eventCb = (eCallback *)event->data;
-
-			if (eventCb == NULL) {
-				event = event->next;
-			} else {
-			  //				sprintf(buff, "Node data: %d", eventCb->function);
-			  //printf(buff);
-			  //_logit(fp, buff);
-			  event = event->next;
-			}
+		if (state == gExit) {
+			break;
 		}
-	}
-	fclose(fp);
-}*/
+		
+		tmp = (char *)recv_data(listenConnection, 60);
 
+		if (tmp != NULL) {
+			printf("data: %s\n", tmp);
+			id = atoi((char*)strsep(&tmp, ","));
 
-
-void _logit(FILE * fp, char *message)
-{
-	fprintf(fp, "%s\n", message);
-}
-
-int sendToClients(char * data)
-{
-	int i, result;
-	printf("Before send data to all clients\n");
-	
-	for (i = 0; i < 2; i++) {
-		if (send_data(clients[i].data, data) != 0) {
-			printf("Failed to send data to client %d\n", i);
-		} else {
-			printf("Test\n");
+			if (id <= no_players && id > 0) {
+				if (tmp != NULL) {
+					printf("Write %s to slot %d\n", tmp, id-1);
+					SDL_mutexP(p_lock[id-1]);
+					writeSlot(cb[id - 1], tmp);
+					SDL_mutexV(p_lock[id-1]);
+				}
+			}
 		}
 	}
 	
 	return 0;
 }
-	
 
-
-void runEvent(player * p, char * data)
+void printWorld()
 {
-	printf("Runevent: %s\n", data);
-	
-	if (!strcmp(data, "left")) {
-		movePlayer(p, gameWorld.objects, 1, left);
-	} else if (!strcmp(data, "right")) {
-		movePlayer(p, gameWorld.objects, 1, right);
-	} else if (!strcmp(data, "up")) {
-		movePlayer(p, gameWorld.objects, 1, up);
+	int i;
+	player p;
+	object b;
+
+	printf("------------ Print world data ----------------\n");
+
+	for (i = 0; i < no_players; i++) {
+		p = gameWorld.players[i];
+		printf("Player %d on team %d, contains [%d %d %d %d]\n", p.id, p.team, p.box.x, p.box.y, p.box.width, p.box.height);
+	}
+
+	for (i = 0; i < NO_OBJECTS; i++) {
+		b = gameWorld.objects[i];
+		printf("Object %d, contains [%d %d %d %d] and is movable: %d\n", b.id, b.box.x, b.box.y, b.box.width, b.box.height, b.movable);
+	}
+
+	printf("----------------- End of world data ------------------------\n");
+}
+
+
+/**
+ Author: 	Joel Denke
+ Description: 	Creates server listener on predfined port
+ Params:	listener  Connection struct to save listener to
+ */
+void createListener(connection_data * listener)
+{
+	int i;
+
+	for (i = 0; i < no_players; i++) {
+		if (clients[i].available == 0) {
+			listener = create_connection_data("0.0.0.0", PORT, 7, clients[i].data->sock_fd, listener);
+		}
 	}
 }
-		
 
-/*
+int checkAvailable()
+{
+	int n, p;
+	
+	for (p = 0; p < no_players; p++) {
+		//printf("Player %d is available: %d\n", p+1, clients[p].available);
+		
+		if (clients[p].available == 0) {
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
+/**
+ Author: 	Joel Denke, Marcus Isaksson
+ Description: 	Main function that runs the server
+ */
+int main(int argc, char *argv[])
+{
+	int i, number;
+	listenConnection = malloc(sizeof(connection_data));
+	SDL_Thread *listener = malloc(sizeof(SDL_Thread*));
+
+	if (argc >= 1) {
+		number = atoi(argv[1]);
+		
+		if (number > 0 && number <= NO_PLAYERS) {
+			no_players = number;
+		}
+	}
+
+	for (i = 0; i < no_players; i++)
+	{
+		clients[i].available = 1;
+		clients[i].data = malloc(sizeof(connection_data));
+		cb[i]           = malloc(sizeof(cBuffer));
+
+		initSlots(cb[i], BUFFER_SIZE);
+		p_lock[i] = SDL_CreateMutex();
+	}
+
+	state = gStart;
+
+	while (1) {
+		switch (state) {
+			case gStart :
+				checkConnections();
+
+				if (checkPlayers()) {
+					state = gInit;
+				}
+				break;
+			case gInit:
+				if (lConnection == 0) {
+					createListener(listenConnection);
+					lConnection = 1;
+				}
+				
+				listener = SDL_CreateThread(listenData, NULL);
+				
+				if (listener == NULL) {
+					printf("\nListen thread SDL_CreateThread failed: %s\n", SDL_GetError());
+					return -1;
+				}
+
+				mapLoad(&gameWorld, map_no);
+				startGame();
+				printWorld();
+				state = gRunning;
+				break;
+			case gRunning :
+				if (!checkAvailable()) {
+					state = gExit;
+					printf("Try to exit server\n");
+				} else {
+					checkTeamWon();
+					movePlayers(&gameWorld, no_players);
+				}
+				break;
+			case gEnd :
+				break;
+			case gExit :
+				printf("Waiting for threads to quit\n");
+				free(listenConnection);
+				free(listener);
+				cleanup();
+				exit(0);
+				return 0;
+				break;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ Author: 	Joel Denke
+ Description: 	Send data to all clients that are connected to server
+ Params: 	data	Data to send
+ Return value:  0 if success on all clients or else last successfull client that received data
+ */
+int sendToClients(char * data, int notimes)
+{
+	int i, success = 1;
+
+	printf("Try to send data (%s) to clients\n", data);
+
+	for (i = 0; i < 1; i++) {
+		for (i = 0; i < no_players; i++) {
+			if (clients[i].available == 0) {
+				if (send_data(clients[i].data, data) != 0) {
+					success = 0;
+				}
+			}
+		}
+	}
+
+	return success;
+}
+
+/**
+ Author: 	Joel Denke
+ Description: 	Temporarly stores coordinates of objects, to check if they have moved (Make game faster)
+ */
+void saveCoordinates(box * objectCoordinates)
+{
+	int i;
+
+	for (i = 0; i < NO_OBJECTS; i++) {
+		objectCoordinates[i] = gameWorld.objects[i].box;
+	}
+}
+
+/**
+ * Author: 	Joel Denke
+ * Description: 	Send only moved objects on server to each client for update
+ */
+void sendObjects(box * objectCoordinates)
+{
+	char data[MESSAGE_SIZE];
+	int i, xb, yb, x, y;
+
+	for (i = 0; i < NO_OBJECTS; i++) {
+		xb = objectCoordinates[i].x;
+		yb = objectCoordinates[i].y;
+		x = gameWorld.objects[i].box.x;
+		y = gameWorld.objects[i].box.y;
+
+		if (abs(xb - x) > 0 || abs(yb - y) > 0) {
+			sprintf(data, "%d,%d,%d,%d", 2, i, x, y);
+			sendToClients(data,1);
+		}
+	}
+}
+
+/**
+ * Author: 	Joel Denke
+ * Description: 	Player jumps
+ * Params: 	id	Player id
+ */
+void jumping(player * p)
+{
+	if (abs(p->jumpbox.x - p->box.x) < p->jumpbox.width/2 && p->velocity > 0) {
+		p->velocity -= 1;
+	} else if (abs(p->jumpbox.x - p->box.x) > p->jumpbox.width/2 && p->velocity < 5) {
+		p->velocity += 1;
+	} else {
+		p->velocity = 0;
+	}
+
+	if (abs(p->jumpbox.y - p->box.y) < p->jumpbox.height && !p->blockup)
+	{
+		if (movePlayer(p, &gameWorld, no_players, up)) {
+			char * sData = malloc(sizeof(char) * 100);
+			sprintf(sData, "%d,%d,%d,%d", 1, p->id, p->box.x, p->box.y);
+			sendToClients(sData,1);
+			free(sData);
+		} else {
+			p->velocity = 0;
+			p->blockup = 1;
+		}
+	}
+	else
+	{
+		p->blockup = 1;
+	}
+}
+
+/**
+ Author: 	Joel Denke, Marcus Isaksson
+ Description: 	Runs event
+ Params: 	p	Player that runs the event
+		data	Event data to parse and run
+ */
+void runEvent(player * p, char * data)
+{
+	if (!strcmp(data, "left")) {
+		movePlayer(p, &gameWorld, no_players, left);
+	} else if (!strcmp(data, "right")) {
+		movePlayer(p, &gameWorld, no_players, right);
+	} else if (!strcmp(data, "up")) {
+		if (p->jump == 0) {
+			p->jumpbox = p->box;
+			p->jumpbox.width *= 2;
+			p->jumpbox.height *= 2;
+			p->jump = 1;
+		}
+	} else if (!strcmp(data, "quit")) {
+		char * string = malloc(sizeof(char) * 100);
+		sprintf(string, "3,%d,quit", p->id);
+		clients[p->id - 1].available = 1;
+		sendToClients(string,1);
+		free(string);
+	}
+}
+
+
+/**
+ Author: 	Joel Denke
+ Description: 	Cleanup the server, to join threads, destroy mutexes and free buffer.
+ */
+void cleanup()
+{
+	int i;
+
+	if (state == gExit) {
+		for (i = 0; i < no_players; i++)
+		{
+			SDL_WaitThread(threads[i], NULL);
+			free(&cb[i]);
+			SDL_DestroyMutex(p_lock[i]);
+		}
+		
+		SDL_Quit();
+	}
+}
+
+int movePlayers(world * gWorld, int noPlayers)
+{
+	int rValue, no, xb, yb, i;
+	char * elem    = malloc(sizeof(char) * MESSAGE_SIZE);
+	char  * sData = malloc(sizeof(char) * MESSAGE_SIZE);
+	box * oCoordinates = (box *)calloc(NO_OBJECTS, sizeof(box));
+	struct timer_t2 fps;
+	
+	for (i = 0; i < noPlayers; i++) {
+		player * p = &gWorld->players[i];
+		timer_start(&fps);
+		yb = p->box.y;
+		xb = p->box.x;
+		//printf("Cordinates before updated on player %d, [%d, %d]\n", p->id, xb, yb);
+		saveCoordinates(oCoordinates);
+		
+		if (p->jump == 1) {
+			jumping(p);
+		}
+		
+		gravity(p, &gameWorld, no_players);
+		fallObjects(&gameWorld, no_players);
+		
+		SDL_mutexP(p_lock[i]);
+		if (!slotsEmpty(cb[i])) {
+			elem = readSlot(cb[i]);
+			
+			if (elem != NULL) {
+				runEvent(p, elem);
+			}
+		}
+		SDL_mutexV(p_lock[i]);
+		
+		if (abs(yb - p->box.y) > 0 || abs(xb - p->box.x) > 0) {
+			sprintf(sData, "%d,%d,%d,%d", 1, p->id, p->box.x, p->box.y);
+			sendToClients(sData, 1);
+		}
+		
+		sendObjects(oCoordinates);
+		
+		if (timer_get_ticks(&fps) < 1000 / FPS)
+		{
+			SDL_Delay(( 1000 / FPS) - timer_get_ticks(&fps));
+		}
+	}
+}
+
+/**
  Author: 	Joel Denke, Marcus Isaksson
  Description: 	Runs the client thread (Listen for user input, moveplayer and synchronize client to server).
  Params: 	parameters	void-pointer to player struct
@@ -418,26 +614,63 @@ void runEvent(player * p, char * data)
  */
 int runPlayer(void* parameters)
 {
-	player * p = (player*) parameters;
-	movement direction = right;
-	int rValue;
-	char * data = malloc(sizeof(char) * 1500);
-	char * send_coord = malloc(sizeof(char) * 1500);
+	int rValue, no, xb, yb, i;
+	player * p     = (player*) parameters;
+	char * elem    = malloc(sizeof(char) * MESSAGE_SIZE);
+	char  * sData = malloc(sizeof(char) * MESSAGE_SIZE);
+	box * oCoordinates = (box *)calloc(NO_OBJECTS, sizeof(box));
+	struct timer_t2 fps;
+
+	no = p->id - 1;
 
 	while (1) {
-		SDL_LockMutex(lock);
-		data = messageBuffer[p->id];
-		messageBuffer[p->id] = "";
-		SDL_UnlockMutex(lock);
-		
-		if (strlen(data) != 0) {
-			printf("RunPlayer: %s\n", data);
-			runEvent(p, data);
-			printf("Before trying to resolve new coordinates\n");
-			sprintf(send_coord, "1,%d,%d,%d", p->no, p->box.x, p->box.y);
-			printf("Before send coordinate string to clients: (%s)\n", send_coord);
-			send_data(clients[p->no].data, send_coord);
-			updateObjects();
+		switch (state) {
+			case gRunning :
+				timer_start(&fps);
+				yb = p->box.y;
+				xb = p->box.x;
+				//printf("Cordinates before updated on player %d, [%d, %d]\n", p->id, xb, yb);
+				saveCoordinates(oCoordinates);
+
+				if (p->jump == 1) {
+					jumping(p);
+				}
+
+				gravity(p, &gameWorld, no_players);
+				fallObjects(&gameWorld, no_players);
+
+				SDL_mutexP(p_lock[no]);
+				if (!slotsEmpty(cb[no])) {
+					elem = readSlot(cb[no]);
+
+					if (elem != NULL) {
+						runEvent(p, elem);
+					}
+				}
+				SDL_mutexV(p_lock[no]);
+
+				printf("Cordinates after updated on player %d, [%d, %d]\n", p->id, abs(xb - p->box.x), abs(yb - p->box.y));
+				
+				if (abs(yb - p->box.y) != 0 || abs(xb - p->box.x) != 0) {
+					sprintf(sData, "%d,%d,%d,%d", 1, p->id, p->box.x, p->box.y);
+					sendToClients(sData, 1);
+				}
+
+				sendObjects(oCoordinates);
+
+				if (timer_get_ticks(&fps) < 1000 / FPS)
+				{
+					SDL_Delay(( 1000 / FPS) - timer_get_ticks(&fps));
+				}
+				break;
+			case gStart :
+				printf("Client id %d is waiting for game to start\n", p->id);
+				break;
+			case gExit :
+				free(elem);
+				free(sData);
+				return 0;
+				break;
 		}
 	}
 

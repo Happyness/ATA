@@ -1,23 +1,51 @@
-all: calc controller network server client
+all: libraries test_stuff 
 
-libraries: calc controller network
+libraries: calc controller timer network cbuffer structure draw menu editor graphics 
 
 test_stuff: server client
 
 network: ..\src\includes\network\udp_protocol.c
-	gcc -O0 -ggdb -c -o libudp_protocol.o ..\src\includes\network\udp_protocol.c
-	gcc -O0 -ggdb -shared -o libudp_protocol.dll libudp_protocol.o -lws2_32
+	gcc -O0 -D _DEBUG_ -ggdb -c -o libudp_protocol.o ..\src\includes\network\udp_protocol.c -IC:\SDL\include\SDL
+	gcc -O0 -ggdb -shared -o libudp_protocol.dll libudp_protocol.o -lws2_32 -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL
 
 controller: ..\src\includes\player\controller.c
-	gcc -O0 -ggdb -c -o libcontroller.o ..\src\includes\player\controller.c
-	gcc -O0 -ggdb -shared -L. -llibcalc -o libcontroller.dll libcontroller.o
+	gcc -O0 -ggdb -c -o libcontroller.o ..\src\includes\player\controller.c -IC:\SDL\include\SDL
+	gcc -O0 -ggdb -shared -L. -lcalc -o libcontroller.dll libcontroller.o
 
-calc: ..\src\includes\libcalc.c
-	gcc -O0 -ggdb -c -o libcalc.o  ..\src\includes\libcalc.c
+calc: ..\src\includes\calc.c
+	gcc -O0 -ggdb -c -o libcalc.o  ..\src\includes\calc.c -IC:\SDL\include\SDL
 	gcc -O0 -ggdb -shared -o libcalc.dll libcalc.o
 
+timer: ../src/includes/graphics/timer.c
+	gcc -O0 -ggdb -c  -o libtimer.o ../src/includes/graphics/timer.c -IC:\SDL\include\SDL	
+	gcc -O0 -ggdb -shared -o libtimer.dll libtimer.o -LC:\SDL\lib -lSDL
+
+editor: ../src/includes/graphics/editor.c
+	gcc -O0 -ggdb -c  -o libeditor.o ../src/includes/graphics/editor.c -IC:\SDL\include\SDL -I../src/includes/graphics	
+	gcc -O0 -ggdb -shared -o libeditor.dll libeditor.o -L. -ldraw -lstructure -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lopengl32
+
+menu: ../src/includes/graphics/menu.c
+	gcc -O0 -ggdb -c -o libmenu.o ../src/includes/graphics/menu.c -lopengl32 -IC:\SDL\include\SDL
+	gcc -O0 -ggdb -shared -o libmenu.dll libmenu.o -L. -lcalc -ldraw -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lSDL_image -lopengl32
+
+structure: ../src/includes/graphics/structure.c
+	gcc -O0 -ggdb -c  -o libstructure.o ../src/includes/graphics/structure.c -IC:\SDL\include\SDL	
+	gcc -O0 -ggdb -shared -o libstructure.dll libstructure.o
+
+draw: ../src/includes/graphics/draw.c
+	gcc -O0 -ggdb -c  -o libdraw.o ../src/includes/graphics/draw.c -L . -lstructure -lcalc -lgraphics -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lSDL_image -lopengl32 -I../src/includes/graphics
+	gcc -O0 -ggdb -shared -o libdraw.dll libdraw.o -L. -lstructure -lcalc -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lSDL_image -lopengl32
+
+cbuffer: ../src/includes/cbuffer.c
+	gcc -O0 -ggdb -c -o libcbuffer.o ../src/includes/cbuffer.c
+	gcc -O0 -ggdb -shared -o libcbuffer.dll libcbuffer.o
+
+graphics: ../src/includes/graphics.c
+	gcc -O0 -ggdb -c  -o libgraphics.o ../src/includes/graphics.c -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lSDLmain -lSDL_mixer -lopengl32 -L. -ldraw  -lstructure -leditor
+	gcc -O0 -ggdb -shared -o libgraphics.dll libgraphics.o -lcalc -IC:\SDL\include\SDL -LC:\SDL\lib -lSDL -lSDL_image -lSDLmain -lSDL_mixer -lopengl32 -L. -ltimer -ldraw  -lstructure -leditor -lmenu
+
 client: ..\src\client.c
-	gcc -O0 -ggdb -o client ..\src\client.c -lws2_32 -L . -ludp_protocol
+	gcc -O0 -ggdb -o client ..\src\client.c -IC:\SDL\include\SDL -L. -LC:\SDL\lib -lmingw32 -lws2_32 -ludp_protocol -lcbuffer -ltimer -lstructure -ldraw -leditor -lgraphics -lSDLmain -lSDL -lSDL_mixer -mwindows
 
 server: ..\src\server.c
-	gcc -O0 -ggdb -o server ..\src\server.c -lmingw32 -L . -ludp_protocol -lcontroller -lcalc -IC:\SDL\SDL-1.2.13\include\SDL -LC:\SDL\SDL-1.2.13\lib -lSDLmain -lSDL -lws2_32
+	gcc -O0 -ggdb -o server ..\src\server.c -lmingw32 -L. -ludp_protocol -lstructure -lcbuffer -ltimer -lcontroller -lcalc -IC:\SDL\include\SDL -LC:\SDL\lib -lSDLmain -lSDL -lws2_32

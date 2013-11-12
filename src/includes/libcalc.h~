@@ -6,25 +6,28 @@
  * @date   12 april 2012
  */
 
+#include <stdio.h>
+#include <unistd.h>
+#include "graphics/structure.h"
+
 #ifndef _LIBCALC_H
 #define _LIBCALC_H
 
 /**
- * Function that test if two boxes intersects or not
- *
- * @author	Joel Denke	mail@happyness.se
- * @param 	a  		Properties of a box a
- * @param 	b 		Properties of a box b
- *
+ Author: 	Joel Denke
+ Description: 	Function that test if two boxes intersects or not
+ Params: 	box		Box one to test
+		box 		Box two to test
+ Return value:  1 if intersects and 0 if not
  */
-int isCollision(struct box, struct box);
+int isCollision(box, box);
 
 /**
- * Calculate friction and gravity into length in one timestep
- *
- * @author	Joel Denke	mail@happyness.se
- * @param	box       	Properties of a box
- * @param	direction 	Direction you want to go.
+ Author: 	Joel Denke
+ Description: 	Function that test if two boxes intersects or not
+ Params: 	box		Properties of a box
+		direction 	Direction of the box.
+ Return value:  Length to move
  */
-int calculateLengthToMove(struct player *, enum movement);
+int calculateLengthToMove(box, movement);
 #endif

@@ -1,4 +1,0 @@
-project(world)
-add_library(structure structure.c)
-
-

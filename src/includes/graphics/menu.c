@@ -1,43 +1,33 @@
 #ifndef _C_MENU
 #define _C_MENU
 
-#include <SDL/SDL.h>
-#include <SDL/SDL_opengl.h>
-
 #include "menu.h"
 
+menu meny;
 
-/*
- * Author: Robin & Sarah
- * Description: Initializing the buttons, backgrounds, offset..etc..
- *
- */
-void load_menu(char *background, char *play, char *options, char *editor, char *exit, int screen_max_x, int screen_max_y )
+int load_menu(char *background, char *play, char *options, char *editor, char *exit, char *back, int screen_max_x, int screen_max_y )
 {
 	printf("Before inside load_menu %s, %s, %s, %s, %s\n", background, play, options, editor, exit);
-	
-    meny.menu_bg_texture = load_imageRGBA(background);
-    meny.button_play 	  = load_imageRGBA(play);
-    meny.button_options = load_imageRGBA(options);
-    meny.button_editor = load_imageRGBA(editor);
-    meny.button_exit = load_imageRGBA(exit);
-    
+
+    meny.butText.menu_bg_texture = load_imageRGBA(background);
+    meny.butText.button_play 	 = load_imageRGBA(play);
+    meny.butText.button_options  = load_imageRGBA(options);
+    meny.butText.button_editor   = load_imageRGBA(editor);
+    meny.butText.button_exit     = load_imageRGBA(exit);
+    meny.butText.button_back     = load_imageRGBA(back);
+
     printf("After loaded images\n");
-    
-    meny.x_play = (screen_max_x - BUTTON_WIDTH) / 2;
-    meny.y_play = 100;
-    meny.x_options = (screen_max_x - BUTTON_WIDTH) / 2;
-    meny.y_options = 200;
-    meny.x_editor = (screen_max_x - BUTTON_WIDTH) / 2;
-    meny.y_editor = 300;
-    meny.x_exit = (screen_max_x - BUTTON_WIDTH) / 2;
-    meny.y_exit = 400;
+
+    meny.x_play     = (screen_max_x - BUTTON_WIDTH) / 2;
+    meny.y_play     = (screen_max_y - BUTTON_HEIGHT) *1/2;
+    meny.x_options  = (screen_max_x - BUTTON_WIDTH) / 2;
+    meny.y_options  = ((screen_max_y - BUTTON_HEIGHT) *1/2)+BUTTON_HEIGHT + 10;
+    meny.x_editor   = (screen_max_x - BUTTON_WIDTH) / 2;
+    meny.y_editor   = ((screen_max_y - BUTTON_HEIGHT) *1/2)+BUTTON_HEIGHT*2 + 20;
+    meny.x_exit     = (screen_max_x - BUTTON_WIDTH) / 2;
+    meny.y_exit     = ((screen_max_y - BUTTON_HEIGHT) *1/2)+BUTTON_HEIGHT*3 + 30;
 }
-/*
- * Author: Robin & Sarah
- * Description: Checks positioning for the mouse compared to buttons
- *
- */
+
 int check_menu(int mouse_x, int mouse_y)
 {
     if( (mouse_x > meny.x_play) && (mouse_x < meny.x_play + BUTTON_WIDTH) )
@@ -73,51 +63,38 @@ int check_menu(int mouse_x, int mouse_y)
     return 0;
 }
 
-/*
- * Author: Robin & Sarah
- * Description: Switches texture on button while hovering the mouse over it.
- *
- */
 //  ***********IMPORTANT************
 //  maybe use much CPU power. !!still in testing!!
 void mouse_over_menu(int mouse_x, int mouse_y)
 {
     int mouse_over_button;
     mouse_over_button = check_menu( mouse_x, mouse_y );
-    
-    printf("Before load image in mouse over menu, %d\n", mouse_over_button);
 
     if( mouse_over_button == 1 )
     {
-        //meny.button_play = load_imageRGBA("play_activ.png");
+        meny.butText.button_play = load_imageRGBA("menu/play_activ.png");
     }
     else if( mouse_over_button == 2 )
     {
-        //meny.button_options = load_imageRGBA("options_activ.png");
+        meny.butText.button_options = load_imageRGBA("menu/options_activ.png");
     }
     else if( mouse_over_button == 3 )
     {
-        //meny.button_editor = load_imageRGBA("editor_activ.png");
+        meny.butText.button_editor = load_imageRGBA("menu/editor_activ.png");
     }
     else if( mouse_over_button == 4 )
     {
-        //meny.button_exit = load_imageRGBA("exit_activ.png");
+        meny.butText.button_exit = load_imageRGBA("menu/exit_activ.png");
     }
     else
     {
-	    printf("Before load inactive images\n");
-        //meny.button_play = load_imageRGBA("play_inactiv.png");
-        //meny.button_options = load_imageRGBA("options_inactiv.png");
-        //meny.button_editor = load_imageRGBA("editor_inactiv.png");
-        //meny.button_exit = load_imageRGBA("exit_inactiv.png");
+        meny.butText.button_play = load_imageRGBA("menu/play_inactiv.png");
+        meny.butText.button_options = load_imageRGBA("menu/options_inactiv.png");
+        meny.butText.button_editor = load_imageRGBA("menu/editor_inactiv.png");
+        meny.butText.button_exit = load_imageRGBA("menu/exit_inactiv.png");
     }
 }
 
-/*
- * Author: Robin
- * Description: Switches texture on button while clicking the mouse on it.
- *
- */
 int mouse_down_menu( int mouse_x, int mouse_y )
 {
     int mouse_over_button;
@@ -125,35 +102,30 @@ int mouse_down_menu( int mouse_x, int mouse_y )
 
     if( mouse_over_button == 1 )
     {
-        //meny.button_play = load_imageRGBA("play_pressed.png");
+        meny.butText.button_play = load_imageRGBA("menu/play_pressed.png");
     }
     else if( mouse_over_button == 2 )
     {
-        //meny.button_options = load_imageRGBA("options_pressed.png");
+        meny.butText.button_options = load_imageRGBA("menu/options_pressed.png");
     }
     else if( mouse_over_button == 3 )
     {
-        //meny.button_editor = load_imageRGBA("editor_pressed.png");
+        meny.butText.button_editor = load_imageRGBA("menu/editor_pressed.png");
     }
     else if( mouse_over_button == 4 )
     {
-        //meny.button_exit = load_imageRGBA("exit_pressed.png");
+        meny.butText.button_exit = load_imageRGBA("menu/exit_pressed.png");
     }
     else
     {
-        //meny.button_play = load_imageRGBA("play_inactiv.png");
-        //meny.button_options = load_imageRGBA("options_inactiv.png");
-        //meny.button_editor = load_imageRGBA("editor_inactiv.png");
-        //meny.button_exit = load_imageRGBA("exit_inactiv.png");
+        meny.butText.button_play = load_imageRGBA("menu/play_inactiv.png");
+        meny.butText.button_options = load_imageRGBA("menu/options_inactiv.png");
+        meny.butText.button_editor = load_imageRGBA("menu/editor_inactiv.png");
+        meny.butText.button_exit = load_imageRGBA("menu/exit_inactiv.png");
     }
     return 1;
 }
 
-/*
- * Author: Sarah
- * Description: checks if any button was pressed and continues from the users option.
- *
- */
 int press_menu(int mouse_x, int mouse_y)
 {
     int mouse_over_button;
@@ -161,45 +133,127 @@ int press_menu(int mouse_x, int mouse_y)
 
     if( mouse_over_button == 1 )
     {
-	    printf("Try to play\n");
-        playing();
+	    printf("Trying to play\n");
+        return 1;
     }
     else if( mouse_over_button == 2 )
     {
-        //options();
+        return 2;
     }
     else if( mouse_over_button == 3 )
     {
-        in_editor();
+        return 3;
     }
     else if( mouse_over_button == 4 )
     {
-        clean_up();
-        exit(0);
+        return 4;
     }
     else
     {
-        //meny.button_play = load_imageRGBA("play_inactiv.png");
-        //meny.button_options = load_imageRGBA("options_inactiv.png");
-        //meny.button_editor = load_imageRGBA("editor_inactiv.png");
-        //meny.button_exit = load_imageRGBA("exit_inactiv.png");
+        meny.butText.button_play = load_imageRGBA("menu/play_inactiv.png");
+        meny.butText.button_options = load_imageRGBA("menu/options_inactiv.png");
+        meny.butText.button_editor = load_imageRGBA("menu/editor_inactiv.png");
+        meny.butText.button_exit = load_imageRGBA("menu/exit_inactiv.png");
     }
     return 0;
 }
 
-/*
- * Author: Robin & Sarah
- * Description: Draw the menu using boxes starting with background and working to the top layers.
- *
- */
-void show_menu(int screen_max_x, int screen_max_y)
+int check_options(int mouse_x, int mouse_y)
 {
+    if( ((mouse_x > (800-250)/2) && (mouse_x < ((800-250)/2)+250)) && ( (mouse_y > 600/2) && (mouse_y < (600/2) + 15) ))
+    {
+        return 1;
+    }
+    else if( ((mouse_x > (800-200)/2) && (mouse_x < ((800-200)/2)+200)) && ( ( mouse_y > 500) && ( mouse_y < 550) ))
+    {
+        printf("check options Försöker bryta ut ur options\n");
+        return 2;
+    }
+    else
+        return 0;
+}
+
+void mouse_over_options(int mouse_x, int mouse_y)
+{
+    int menu_point = check_options(mouse_x, mouse_y);
+
+    if( menu_point == 2 )
+    {
+        meny.butText.button_back = load_imageRGBA("menu/back_activ.png");
+    }
+    else
+
+        meny.butText.button_back = load_imageRGBA("menu/back_inactiv.png");
+}
+
+int press_options(int mouse_x, int mouse_y)
+{
+    int mouse_over_button;
+    mouse_over_button = check_options( mouse_x, mouse_y );
+
+    if( mouse_over_button == 1 )
+    {
+        printf("Enter typemode for IP field\n");
+        return 1;
+    }
+    else if( mouse_over_button == 2 )
+    {
+        meny.butText.button_back = load_imageRGBA("menu/back_pressed.png");
+        printf("press optionsFörsöker bryta ut ur options\n");
+        return 2;
+    }
+    else
+    {
+        meny.butText.button_back = load_imageRGBA("menu/back_inactiv.png");
+        return 0;
+    }
+}
+
+void handle_input(SDL_Event event, char str[])
+{
+  int size = 16;
+    //If a key was pressed
+    if( event.type == SDL_KEYDOWN )
+    {
+        if( ( event.key.keysym.sym == SDLK_BACKSPACE ) && ( strlen(str) != 0 ) )
+        {
+            //Remove a character from the end
+            printf("string lenght %d %c\n",strlen(str), str[strlen(str)-1]);
+            str[strlen(str)-1] = 0;
+        }
+        //If the string less than maximum size
+        else if( (strlen(str) < size) && ( event.key.keysym.sym != SDLK_BACKSPACE) && ( event.key.keysym.sym != SDLK_ESCAPE) && ( event.key.keysym.sym != SDLK_RETURN))
+        {
+            sprintf(str,"%s%c",str,event.key.keysym.sym);
+            str[strlen(str)] = 0;
+        }
+
+    }
+}
+void drawBack()
+{
+    glPushMatrix();
+        glBindTexture(GL_TEXTURE_2D, meny.butText.button_back);
+        glTranslatef( (800 - 200)/2, 500, 0 );
+        glBegin( GL_QUADS );
+            //Draw options
+            glTexCoord2f(0.0f, 0.0f); glVertex2f(   0,  0);
+            glTexCoord2f(1.0f, 0.0f); glVertex2f( 200,  0);
+            glTexCoord2f(1.0f, 1.0f); glVertex2f( 200, 50);
+            glTexCoord2f(0.0f, 1.0f); glVertex2f(   0, 50);
+        glEnd();
+    glPopMatrix();
+}
+void drawMenu(int screen_max_x, int screen_max_y)
+{
+    //Clear the screen
+    glClear( GL_COLOR_BUFFER_BIT );
      //Move to offset
     glTranslatef( 0, 0, 0 );
 
     glPushMatrix();
 
-        glBindTexture(GL_TEXTURE_2D, meny.menu_bg_texture);
+        glBindTexture(GL_TEXTURE_2D, meny.butText.menu_bg_texture);
         glTranslatef(0,0,0);
         glBegin( GL_QUADS );
             //Draw player
@@ -210,10 +264,9 @@ void show_menu(int screen_max_x, int screen_max_y)
 
         glEnd();
     glPopMatrix();
-
     glPushMatrix();
 
-        glBindTexture(GL_TEXTURE_2D, meny.button_play);
+        glBindTexture(GL_TEXTURE_2D, meny.butText.button_play);
         glTranslatef( meny.x_play, meny.y_play, 0 );
         glBegin( GL_QUADS );
             //Draw player
@@ -226,7 +279,7 @@ void show_menu(int screen_max_x, int screen_max_y)
     glPopMatrix();
 
     glPushMatrix();
-        glBindTexture(GL_TEXTURE_2D, meny.button_options);
+        glBindTexture(GL_TEXTURE_2D, meny.butText.button_options);
         glTranslatef( meny.x_options, meny.y_options, 0 );
         glBegin( GL_QUADS );
             //Draw player
@@ -239,7 +292,7 @@ void show_menu(int screen_max_x, int screen_max_y)
     glPopMatrix();
 
     glPushMatrix();
-        glBindTexture(GL_TEXTURE_2D, meny.button_editor);
+        glBindTexture(GL_TEXTURE_2D, meny.butText.button_editor);
         glTranslatef( meny.x_editor, meny.y_editor, 0 );
         glBegin( GL_QUADS );
             //Draw player
@@ -251,9 +304,8 @@ void show_menu(int screen_max_x, int screen_max_y)
         glEnd();
     glPopMatrix();
 
-
     glPushMatrix();
-        glBindTexture(GL_TEXTURE_2D, meny.button_exit);
+        glBindTexture(GL_TEXTURE_2D, meny.butText.button_exit);
         glTranslatef( meny.x_exit, meny.y_exit, 0 );
         glBegin( GL_QUADS );
             //Draw player
@@ -264,22 +316,21 @@ void show_menu(int screen_max_x, int screen_max_y)
 
         glEnd();
     glPopMatrix();
+    glBindTexture(GL_TEXTURE_2D, (GLuint)NULL);
 
     //Reset
     glLoadIdentity();
+    //Update screen
+    SDL_GL_SwapBuffers();
 }
 
-/*
- * Author: Robin
- * Description: Frees the texture so we dont have memory leaking..
- *
- */
-void clean_up_menu(menu *meny)
+void clean_up_menu()
 {
-    glDeleteTextures(1,&meny->menu_bg_texture);
-    glDeleteTextures(1,&meny->button_play);
-    glDeleteTextures(1,&meny->button_options);
-    glDeleteTextures(1,&meny->button_exit);
+    glDeleteTextures(1,&meny.butText.menu_bg_texture);
+    glDeleteTextures(1,&meny.butText.button_play);
+    glDeleteTextures(1,&meny.butText.button_options);
+    glDeleteTextures(1,&meny.butText.button_editor);
+    glDeleteTextures(1,&meny.butText.button_exit);
 }
 
 #endif

@@ -3,9 +3,58 @@
 #include <stdlib.h>
 
 // User headers
-#include "includes/world/structure.h"
-#include "includes/libcalc.h"
-#include "includes/linkedList.h"
+#include "includes/graphics/structure.h"
+#include "includes/calc.h"
+#include "includes/cbuffer.h"
+
+world * gameWorld;
+
+void printWorld()
+{
+	int i;
+	player p;
+	object b;
+	
+	printf("------------ Print world data ----------------\n");
+	
+	/*
+	for (i = 0; i < TEST_PLAYERS; i++) {
+		p = gameWorld.players[i];
+		printf("Player %d, contains [%d %d %d %d]\n", p.id, p.box.x, p.box.y, p.box.width, p.box.height);	
+	}*/
+	
+	for (i = 0; i < NO_OBJECTS; i++) {
+		b = gameWorld->objects[i];
+		printf("Object %d, contains [%d %d %d %d]\n", b.id, b.box.x, b.box.y, b.box.width, b.box.height);	
+	}
+	
+	printf("----------------- End of world data ------------------------\n");
+}
+
+int testMap()
+{
+	world * gameWorld = malloc(sizeof(world));
+	
+	object tmpobject;
+	tmpobject.box.x = 100;
+	tmpobject.box.y = 500;
+	tmpobject.box.width = 100;
+	tmpobject.box.height = 80;
+	tmpobject.id = 0;
+	tmpobject.movable = 0;
+	gameWorld->objects[0] = tmpobject;
+	
+	object tmpobject2;
+	tmpobject2.box.x = 0;
+	tmpobject2.box.y = 580;
+	tmpobject2.box.width = 800;
+	tmpobject2.box.height = 10;
+	tmpobject2.id = 1;
+	tmpobject2.movable = 0;
+	gameWorld->objects[1] = tmpobject2;
+	
+	mapSave(gameWorld, MAP_FILE);
+}
 
 int testCollision()
 {
@@ -30,24 +79,32 @@ int testCollision()
 	}
 }
 
-int testLinkedList()
+
+int testcBuffer()
 {
-	nodeList *list = malloc(sizeof(nodeList*));
-	insertEnd(list, createNode("test1"));
-	insertEnd(list, createNode("test2"));
-	insertEnd(list, createNode("test3"));
-	insertEnd(list, createNode("test4"));
+	cBuffer * cb = malloc(sizeof(cBuffer));
+	char * elem = malloc(sizeof(slot));
+	int i;
+	int testBufferSize = 10;
+	char data[1500];
+	initSlots(cb, testBufferSize);
 	
-	linkNode * node = list->end;
+	for (i = 0; i < testBufferSize * 3; i++) {
+		sprintf(data, "testBuffer: %d", i);
+		writeSlot(cb, strdup(data));
+	}
+
+	while (!slotsEmpty(cb)) {
+		elem = readSlot(cb);
+		printf("%s\n", elem);
+	}
 	
-	do {
-		node = node->next;
-		printf("Node data: %s\n", (char *)node->data);
-	} while (node != list->end);
+	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-	testLinkedList();
+	testMap();
+	testcBuffer();
 	testCollision();
 }

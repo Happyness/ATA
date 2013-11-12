@@ -27,38 +27,35 @@
 #define SYN 1
 #define ACK 2
 #define RST 4
-#define RST_ACK 8
 
-// Defines for packet_to_string() function
-#define HANDSHAKE 0
-#define DATA 1
+// Defines for packet_to_string() and string_to_packet() functions
+#define HANDSHAKE 1
+#define DATA 2
 
 // Defines for connection_termination() function
 #define SERVER 0
 #define CLIENT 1
 
 /*
-  Author: Sofia and Daniel
-  Description: Packet type that will be used for actual data transfers
-  Param: proto_id is always "herp", trailer is always "derp".
+ * Author: Sofia and Daniel
+ * Description: Packet type that will be used for actual data transfers
+ * Param: proto_id is always "herp", trailer is always "derp".
  */
 typedef struct {
   char *proto_id;
   uint8_t packet_type;
   uint32_t seq_nr;
-  uint32_t ack;
-  uint32_t ack_seq;
   uint32_t client_id;
   void *data;
   char *trailer;
 } data_packet;
 
 /*
-  Author: Sofia and Daniel
-  Description: Packet type that will be used for initial handshake and
-  teardown of the connection.
-  Param: proto_id is always "herp", trailer is always "derp".
-  flags are defined as SYN = 1, ACK = 2, RST = 4, RST_ACK = 8
+ * Author: Sofia and Daniel
+ * Description: Packet type that will be used for initial handshake and
+ * teardown of the connection.
+ * Param: proto_id is always "herp", trailer is always "derp".
+ * flags are defined as SYN = 1, ACK = 2, RST = 4
  */
 typedef struct {
   char *proto_id;
@@ -71,9 +68,9 @@ typedef struct {
 } handshake_packet;
 
 /*
-  Author: Sofia and Daniel
-  Description: Datatype for connection related data, like sending and
-  receiving end and assigned socket.
+ * Author: Sofia and Daniel
+ * Description: Datatype for connection related data, like sending and
+ * receiving end and assigned socket.
  */
 typedef struct {
   struct sockaddr_in *destination;
@@ -81,20 +78,152 @@ typedef struct {
   uint32_t client_id;
   char *client_ip;
   uint16_t client_port;
+  uint32_t last_seen_pkt[7];
 } connection_data;
 
-int connect_session(connection_data *, char *, uint16_t, char *);
+/*
+ *  Author: Daniel and Sofia
+ *  Description: Function that initializes the connection between client and server
+ *  Params: connection_data *connection, used to fill in the address and socket information
+ *  to be used in subsequent send_data() calls.
+ *  char *server_ip, a string with the server IP address to connect to
+ *  uint16_t server_port, a unsigned 2 byte long integer with the server port to connect to
+ *  char *client_ip, a string with the client IP address
+ *  int client_id, the identification of the client
+ *  Return value: returns 0 if successful, 1 if no server responded to the SYN and -1 on failure and a error message is written to stderr
+ */
+int connect_session(connection_data *, char *, uint16_t, uint16_t);
+
+/*
+ *  Author: Daniel
+ *  Description: Function to terminate a active session
+ *  Params: connection_data *connection, struct containing the connection details
+ *  Return value: returns 0 if successful and -1 if failed and a error message is printed to stderr
+ */
 int end_session(connection_data *);
+
+/*
+ * Author: Sofia and Daniel
+ * Description: A function to send a string inside a data packet 
+ * Params: connection_data *connection, a struct containing relevant socket information
+ * char *data, the string to be sent
+ * Return value: The function will return 0 if success, and -1 if failed.
+ */
 int send_data(connection_data *, char *);
+
+/*
+ *  Author: Sofia and Daniel
+ *  Description: Function that accept a request from a client to start a connection with the server.
+ *  Params: connection_data *connection, used to fill in the address and socket information of the client
+ *  to be used in subsequent send_data() calls to the client.
+ *  uint32_t port, a unsigned 4 byte long integer with the port to listen on
+ *  int client_id, integer value that contains the client_id to assign to the client
+ *  Return value: returns 0 if successful, 1 if a RST is received while listening and -1 if failure and a error message is written to stderr.
+ */
 int accept_session(connection_data *, uint16_t, int);
+
+/*
+ * Author: Daniel
+ * Description: Net initialization function only needed in windows environment
+ * Params: void
+ * Return value: returns 0 on success, -1 on failure, will always return 0 on non-windows platforms
+ */
 int net_init(void);
+
+/*
+ * Author: Daniel
+ * Description: Net cleanup function only needed in windows environment
+ * Params: void
+ * Return value: returns 0 on success, -1 on failure, will always return 0 on non-windows platforms
+ */
 int net_cleanup(void);
+
+/*
+ * Author: Daniel
+ * Description: A function to validate if a received packet is a correct packet
+ * Params: void *packet_ptr, pointer to the packet to be validated
+ * uint32_t type, type of packet to validate 
+ * Return value: returns 0 if valid, 1 if not
+ */
 int is_packet(void *, uint32_t);
+
+/*
+ *  Author: Daniel
+ *  Description: A function to terminate a connection entirely
+ *  Params: connection_data *connection, struct containing the data for the session to terminate
+ *  uint8_t side, value that contains CLIENT or SERVER
+ *  Return value: returns 0 on success.
+ */
 int connection_termination(connection_data *, uint8_t);
+
+/*
+ *  Author: Daniel
+ *  Description: Function that converts a received string to a packet struct.
+ *  Params: char *string, received string
+ *  uint32_t type, the type of packet (DATA or HANDSHAKE), so it knows what packet format to use
+ *  Return value: returns a pointer to the resulting string and NULL on failure
+ */
 void *string_to_packet(char *, uint32_t);
-void *recv_data(connection_data *);
+
+/*
+ * Author: Sofia and Daniel
+ * Description: A function to receive data packets
+ * Params: connection_data *connection, a struct containing relevant socket information
+ * Return value: The function will return the data in the received packet if success, NULL if failed and 
+ * "Terminated" if a RST is received.
+ */
+void *recv_data(connection_data *, int);
+
+/*
+ *   Author: Daniel
+ *   Description: Function that converts a packet struct into a string for sending over the wire.
+ *   Params: void *packet, a pointer to whichever packet struct.
+ *   uint32_t type, gives the type of packet (DATA or HANDSHAKE) to know how to prepare the string.
+ *   Return value: returns a pointer to the resulting string and NULL on failure
+ */
 char *packet_to_string(void *, uint32_t);
-char *listen_socket (connection_data *);
+
+/*
+ * Author: Sofia and Daniel
+ * Description: Function that listen for packets
+ * Params: connection_data *connection to reach information in sock_fd.
+ * Return value: a string containing the received packet or Null if nothing to receive
+ */
+char *listen_socket (connection_data *, int, int);
+
+/*
+ *  Author: Daniel
+ *  Description: Function that creates socket and sockaddr_in struct that composes a connection_data variable
+ *  Params: char *ip, a string with the IP to connect to
+ *  uint16_t port, a 2 byte unsigned int with the port to connect to
+ *  uint32_t client_id, the client id to assign in the connection_data struct
+ *  uint32_t sock_fd, the associated socket that is to be used for listening/sending packets for this connection
+ *  connection_data *connection, a pointer to the connection_data struct that the information should be put into
+ *  Return value: if successful a pointer to the resulting connection_data struct is returned, else NULL
+ */
 connection_data *create_connection_data(char *, uint16_t, uint32_t, uint32_t, connection_data *);
-int setNonblockMode(uint32_t s);
+
+#if defined(__WIN32__) || defined(WIN32)
+/*
+ *  Author: Daniel
+ *  Description: Reimplementation of strsep for windows, as it doesn't have it in it's string.h, based on the description
+ *  of the function in the manpage
+ *  Params: char **stringp, a pointer to a string, that will be repositioned while the string is parsed
+ *  const char *delim, a string that contains the delimiter that the inputted string will be split at
+ *  Return value: The function will return NULL if the pointer to a string is NULL, else the part of the string
+ */
+char *strsep(char **, const char *);
+
+/*
+ * Author: Daniel
+ * Description: inet_ntop function, code from https://memset.wordpress.com/2010/10/09/inet_ntop-for-win32/, all credits to makeitsofw
+ * Params: int af, a constant for which network family to convert from (AF_INET or AF_INET6 are the most common ones)
+ * const void *src, a pointer to the source sockaddr_in struct that the information should be pulled from
+ * char *dst, the buffer that the resulting string will be put
+ * int len, length of the buffer dst
+ * Return value: returns the resulting string on success and NULL on failure
+ */
+const char *inet_ntop(int, const void *, char *, int);
+#endif
+
 #endif
